@@ -1,0 +1,20 @@
+# dsh-software-tools — host-half mount row (browser half discovered via dsh.client).
+#
+# Optional config:
+#   settingsDir: 状态目录(selection.json + catalog.json),默认 $DSH_HOME/software-tools。
+- insert:
+    - id: dsh-software-tools
+      name: dsh-software-tools
+      config: {}
+
+# dsh-software-tools —— 随插件内置 add-software-tool 技能:教模型把新安装的软件
+# 写进用户扩展目录($DSH_HOME/software-tools/catalog.json),无需重编译/重启。
+# provider 只看自己的 skills/ 目录,不并入默认根,避免重复扫描用户技能。
+- insert:
+    - id: software-tools-skill
+      name: '@deepseek-ai/dsh-skill-filesystem'
+      config:
+        providerName: software-tools-skill
+        includeDefaultRoots: false
+        customSkillDirs:
+          - !!js process.getBuiltinModule('node:path').join(process.getBuiltinModule('node:path').dirname(process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('dsh-software-tools/package.json')), 'skills')
