@@ -4,6 +4,8 @@
 
 A sidebar **🔧 软件工具** manager for DeepSeek Harness Web: maintain a curated inventory of local software (WSL CLI tools + Windows apps via interop), check what you want the model to know, and the checked set is injected into the model's system prompt as a compact section — so every session knows what exists on this machine and how to call it.
 
+![panel](docs/images/panel.png)
+
 ## 它解决什么问题 / Problem
 
 模型(如 deepseek-v4-flash)默认不知道你本机装了 IDM、ComfyUI、Obsidian、aria2…… 每次要用都得现解释路径和调用法。这个插件把"本机软件目录 + 调用法"变成**可勾选、持久化、自动注入系统提示**的一等公民,模型直接按 `usage` 字段的现成命令执行。

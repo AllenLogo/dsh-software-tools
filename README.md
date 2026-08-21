@@ -2,6 +2,8 @@
 
 Sidebar **🔧 软件工具** manager for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) Web. Maintain a curated inventory of local software — WSL CLI tools and Windows apps reachable via interop — and check the ones you want the model to know about. The checked set is injected into the model's system prompt as a compact section, so every session knows what software exists on this machine and how to call it. 中文说明见 [README.zh.md](README.zh.md)。
 
+![panel](docs/images/panel.png)
+
 ## Problem
 
 A model (e.g. deepseek-v4-flash) has no idea that you have IDM, ComfyUI, Obsidian, aria2… installed, let alone how to invoke each one. This plugin turns "local software inventory + invocation recipes" into a **checkable, persisted, auto-injected** system-prompt section: the model reads the `usage` field and runs the ready-made command.
