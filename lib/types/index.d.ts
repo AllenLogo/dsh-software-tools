@@ -10,9 +10,15 @@
  * and how to call them — they are not tools in the catalog, they are
  * instructions for the bash / shell tools it already has.
  *
- * State and catalog are served over a loopback-pinned generic RPC channel:
+ * State and catalog are served over a fenced RPC channel `/_dsh-software-tools`:
  *   - `list` → { catalog, selected, section }  (catalog + current selection)
  *   - `set`  → { ok }                          (persist new selection {ids})
+ *
+ * The channel is mounted through src/channel-route.ts rather than
+ * `ctx.connection.rpc.handle()`: on DSH 0.1.5 that registry cannot work from a
+ * plugin (it reads `webServer` off the Connection service's own inject-gated
+ * context) and fails silently inside the `ctx.inject()` child fiber, which is
+ * what made the browser panel show 加载失败. See that file for the details.
  */
 import type { Context } from '@deepseek-ai/cordis';
 export declare const name = "dsh-software-tools";

@@ -3,7 +3,10 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": ["ES2022", "DOM"],
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
     "outDir": "lib",
     "rootDir": "src",
     "declaration": true,
@@ -13,8 +16,16 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": false,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "declarationDir": "lib/types"
   },
-  "include": ["src/index.ts"],
-  "exclude": ["node_modules", "lib", "src/client"]
+  "include": [
+    "src/index.ts",
+    "src/channel-route.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "lib",
+    "src/client"
+  ]
 }

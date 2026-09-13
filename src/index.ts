@@ -10,9 +10,15 @@
  * and how to call them — they are not tools in the catalog, they are
  * instructions for the bash / shell tools it already has.
  *
- * State and catalog are served over a loopback-pinned generic RPC channel:
+ * State and catalog are served over a fenced RPC channel `/_dsh-software-tools`:
  *   - `list` → { catalog, selected, section }  (catalog + current selection)
  *   - `set`  → { ok }                          (persist new selection {ids})
+ *
+ * The channel is mounted through src/channel-route.ts rather than
+ * `ctx.connection.rpc.handle()`: on DSH 0.1.5 that registry cannot work from a
+ * plugin (it reads `webServer` off the Connection service's own inject-gated
+ * context) and fails silently inside the `ctx.inject()` child fiber, which is
+ * what made the browser panel show 加载失败. See that file for the details.
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-connection' // loads ctx.connection augmentation
@@ -20,6 +26,8 @@ import type {} from '@deepseek-ai/dsh-system-prompt' // loads ctx.systemPrompt a
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { mountChannel } from './channel-route.js'
+import type { ConnectionLike, EndpointHandler, WebServerLike } from './channel-route.js'
 
 export const name = 'dsh-software-tools'
 export const inject = ['systemPrompt']
@@ -207,13 +215,13 @@ export function apply(ctx: Context, config: SoftwareToolsConfig = {}): void {
     'dsh-software-tools: system prompt section',
   )
 
-  // 2) Loopback RPC channel for the browser panel (list / set).
-  // NOTE: the browser client validates `result` against rpcResultSchema, so
-  // handlers must return the envelope-inner shape {ok:true, value} /
-  // {ok:false, error:{code,message}} — flat objects fail client-side parse.
-  ctx.inject(['connection'], (connCtx) => {
-    connCtx.effect(() => {
-      const handler = (endpoint: string, payload: unknown): Promise<Record<string, unknown>> => {
+  // 2) Fenced RPC channel for the browser panel (list / set). The browser half
+  //    speaks the Connection envelope, so handlers return the
+  //    `{ok:true, value}` / `{ok:false, error}` pair it validates.
+  ctx.inject(['connection', 'webServer'], (hostCtx) => {
+    const host = hostCtx as unknown as { connection: ConnectionLike; webServer: WebServerLike }
+    hostCtx.effect(() => {
+      const handler: EndpointHandler = (endpoint, payload) => {
         if (endpoint === 'list') {
           const selected = readSelected(config)
           return Promise.resolve({
@@ -231,7 +239,7 @@ export function apply(ctx: Context, config: SoftwareToolsConfig = {}): void {
           if (!Array.isArray(ids) || ids.some((x) => typeof x !== 'string')) {
             return Promise.resolve({
               ok: false,
-              error: { code: 'bad-request', message: 'ids must be an array of strings' },
+              error: { code: 'bad-request', message: 'ids must be an array of strings', details: {} },
             })
           }
           const known = new Set(readCatalog(config).map((t) => t.id))
@@ -239,7 +247,7 @@ export function apply(ctx: Context, config: SoftwareToolsConfig = {}): void {
           if (unknown.length > 0) {
             return Promise.resolve({
               ok: false,
-              error: { code: 'bad-request', message: `unknown tool ids: ${unknown.join(', ')}` },
+              error: { code: 'bad-request', message: `unknown tool ids: ${unknown.join(', ')}`, details: {} },
             })
           }
           writeSelected(config, ids as string[])
@@ -247,16 +255,17 @@ export function apply(ctx: Context, config: SoftwareToolsConfig = {}): void {
         }
         return Promise.resolve({
           ok: false,
-          error: { code: 'bad-request', message: `unknown endpoint: ${endpoint}` },
+          error: { code: 'bad-request', message: `unknown endpoint: ${endpoint}`, details: {} },
         })
       }
-      const stop = connCtx.connection.rpc.handle(
-        CHANNEL,
-        handler as unknown as Parameters<typeof connCtx.connection.rpc.handle>[1],
-        { authority: 'loopback' },
-      )
+      const unregister = mountChannel({
+        channel: CHANNEL,
+        connection: host.connection,
+        webServer: host.webServer,
+        handler,
+      })
       return () => {
-        stop()
+        unregister()
       }
     }, 'dsh-software-tools: rpc channel')
   })
