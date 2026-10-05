@@ -15,10 +15,17 @@
  *   - `set`  → { ok }                          (persist new selection {ids})
  *
  * The channel is mounted through src/channel-route.ts rather than
- * `ctx.connection.rpc.handle()`: on DSH 0.1.5 that registry cannot work from a
- * plugin (it reads `webServer` off the Connection service's own inject-gated
- * context) and fails silently inside the `ctx.inject()` child fiber, which is
- * what made the browser panel show 加载失败. See that file for the details.
+ * `ctx.connection.rpc.handle()`: that registry cannot work from a plugin -- it
+ * reads `webServer` off the Connection service's own inject-gated context -- and
+ * the throw only fails the `ctx.inject()` child fiber, leaving the channel
+ * silently absent (the browser panel then shows 加载失败). Re-verified on DSH
+ * 0.2.0-rc.1: with `ctx.inject(['connection'], ...)` the mount produces no route
+ * at all (`POST /_dsh-software-tools/list` answered by the static fallback as 405
+ * instead of by the Connection fence as 401), exactly as documented in
+ * src/channel-route.ts. Adding `webServer` to the caller's inject list does not
+ * help either: cordis resolves the service's `ctx` through the *service's* fiber
+ * (ReflectService handler -> `ctx[symbols.shadow].fiber`), not the caller's. See
+ * that file for the details.
  */
 import type { Context } from '@deepseek-ai/cordis';
 export declare const name = "dsh-software-tools";

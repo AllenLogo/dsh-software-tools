@@ -25,7 +25,7 @@ const PANEL_ID = 'dst-panel-root'
 /** Find the sidebar shell root (mirrors linxin666's proven selectors). */
 function sidebarRoot(): HTMLElement | undefined {
   const column = document.querySelector<HTMLElement>(
-    '[data-pane="sidebar"], [class*="sidebarCol"]',
+    '[class*="sidebarCol"]',
   )
   if (column === null) return undefined
   return column.querySelector<HTMLElement>('[class*="logoRow"]')?.parentElement ?? column.firstElementChild as HTMLElement | undefined
