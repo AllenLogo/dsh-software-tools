@@ -8,6 +8,7 @@ export declare const zh: {
     readonly selectHint: "已勾选 {n} 个工具";
     readonly sectionLabel: "注入段落预览";
     readonly close: "关闭";
+    readonly backToChat: "返回对话";
     readonly loadFailed: "加载失败";
     readonly empty: "暂无可选工具";
     readonly refresh: "刷新";
@@ -21,6 +22,7 @@ export declare const en: {
     readonly selectHint: "{n} tool(s) selected";
     readonly sectionLabel: "Injected section preview";
     readonly close: "Close";
+    readonly backToChat: "Back to chat";
     readonly loadFailed: "Failed to load";
     readonly empty: "No tools available";
     readonly refresh: "Refresh";

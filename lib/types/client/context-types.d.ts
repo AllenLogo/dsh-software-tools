@@ -31,8 +31,10 @@ export interface ListPayload {
 export interface SetPayload {
     selected: string[];
 }
+/** One channel call: the transport face of the Connection client service. */
+export type CallFn = (endpoint: string, payload?: unknown) => Promise<unknown>;
+/** The Connection client service, narrowed to the one member this half uses. */
 export interface ConnectionLike {
-    isLoopback: boolean;
     rpc: {
         call: (channel: string, endpoint: string, payload?: unknown) => Promise<unknown>;
     };

@@ -52,3 +52,5 @@ minimumReleaseAgeExclude:
   - '@deepseek-ai/dsh-user-approval@0.2.0-rc.1'
   - '@deepseek-ai/dsh-user-questions@0.2.0-rc.1'
   - '@deepseek-ai/dsh-workspace@0.2.0-rc.1'
+  - '@deepseek-ai/dsh-client-ui-layout@0.2.0-rc.1'
+  - '@deepseek-ai/dsh-client-ui-sidebar@0.2.0-rc.1'

@@ -41,7 +41,7 @@ If your pnpm supply-chain policy blocks `dsh plugin add`, install manually: copy
           - !!js process.getBuiltinModule('node:path').join(process.getBuiltinModule('node:path').dirname(process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('dsh-software-tools/package.json')), 'skills')
 ```
 
-Restart `dsh web` and hard-refresh (Ctrl+Shift+R). A **🔧 软件工具** entry appears in the sidebar.
+Restart `dsh web` and hard-refresh (Ctrl+Shift+R). A **软件工具** row appears in the panel rail (between Automation tasks and Task Board).
 
 ## Configuration
 
@@ -67,7 +67,7 @@ Tell the model "add XXX to 软件工具" — the bundled `add-software-tool` ski
 ## How it works
 
 - **Host half** (`src/index.ts`): registers `systemPrompt.section` (`software-tools`, order 200) rendered from the current selection, plus the loopback RPC channel `/ _dsh-software-tools` (`list` / `set`).
-- **Browser half** (`src/client/`): DOM-injected sidebar entry + panel (same selector pattern as the linxin666 plugin family), built by `tsdown` into a lazy-CJS `__ModuleLoader__` bundle (React comes from the host shell).
+- **Browser half** (`src/client/`): contributes two official seats — `sidebar.panellist` (list: the rail row, whose `id` is the panel key and whose `label` is a thunk so the title follows the active locale) and `main` (keyed: the panel body the layout renders in the centre). Both wait on `ctx.slots.inject(key, ...)` for ui-layout / ui-sidebar to declare the seat. Built by `tsdown` into a lazy-CJS `__ModuleLoader__` bundle (React comes from the host shell).
 - **Skill** (`skills/add-software-tool/`): mounted via `dsh-skill-filesystem`'s `customSkillDirs`, scoped to the plugin's own directory so user skill roots stay untouched.
 
 ## License

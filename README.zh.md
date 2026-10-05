@@ -1,8 +1,8 @@
 # dsh-software-tools
 
-侧边栏 **🔧 软件工具** 管理器 —— 为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) Web 端维护一份"本机可用软件清单",勾选后注入模型系统提示,让每个会话都知道这台机器上有什么软件、怎么调用。
+侧边栏 **软件工具** 面板(用 DSH 官方 Slot API 挂在面板导轨与中央面板位)—— 为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) Web 端维护一份"本机可用软件清单",勾选后注入模型系统提示,让每个会话都知道这台机器上有什么软件、怎么调用。
 
-A sidebar **🔧 软件工具** manager for DeepSeek Harness Web: maintain a curated inventory of local software (WSL CLI tools + Windows apps via interop), check what you want the model to know, and the checked set is injected into the model's system prompt as a compact section — so every session knows what exists on this machine and how to call it.
+A sidebar **软件工具** panel for DeepSeek Harness Web: maintain a curated inventory of local software (WSL CLI tools + Windows apps via interop), check what you want the model to know, and the checked set is injected into the model's system prompt as a compact section — so every session knows what exists on this machine and how to call it.
 
 ![panel](docs/images/panel.png)
 
@@ -14,7 +14,7 @@ A sidebar **🔧 软件工具** manager for DeepSeek Harness Web: maintain a cur
 
 | | 能力 | 说明 |
 | --- | --- | --- |
-| 🔧 | 侧边栏面板 | 按分类列出工具目录,勾选即生效(无需重启,下一次请求即可见) |
+| 🎚 | 面板导轨入口 | 按分类列出工具目录,勾选即生效(无需重启,下一次请求即可见) |
 | 📥 | 内置 + 用户扩展合并 | 内置通用目录(aria2 / proxy / playwright / uvx / interop / zstd …);用户扩展 `catalog.json` 同 id 覆盖内置 |
 | 🧠 | 系统提示注入 | 勾选的工具以紧凑段落注入每个请求的 system prompt(`systemPrompt.section`,与 persona / plan-mode 同一机制) |
 | 🛠 | 内置 skill | 随插件自带 `add-software-tool` 技能:模型学会把新装软件写进用户目录,免重编译/重启 |
@@ -43,7 +43,7 @@ dsh plugin --profile web add dsh-software-tools
           - !!js process.getBuiltinModule('node:path').join(process.getBuiltinModule('node:path').dirname(process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('dsh-software-tools/package.json')), 'skills')
 ```
 
-重启 `dsh web` 并硬刷新(Ctrl+Shift+R),侧边栏出现 **🔧 软件工具** 入口。
+重启 `dsh web` 并硬刷新(Ctrl+Shift+R),侧边栏面板导轨出现 **软件工具** 一行(位于 Automation tasks 与 Task Board 之间)。
 
 ## 配置 / Configuration
 
@@ -69,7 +69,7 @@ dsh plugin --profile web add dsh-software-tools
 ## 工作原理 / How it works
 
 - **宿主半** (`src/index.ts`):注册 `systemPrompt.section`(`software-tools`, order 200),每次组装按当前勾选渲染;注册 loopback RPC `/ _dsh-software-tools`(`list` / `set`)。
-- **浏览器半** (`src/client/`):DOM 注入侧边栏入口 + 面板(与 linxin666 系插件同一选择器模式),`tsdown` 构建为 `__ModuleLoader__` 惰性 CJS bundle(免额外依赖,React 由宿主外壳提供)。
+- **浏览器半** (`src/client/`):用官方 Slot API 贡献两个席位 —— `sidebar.panellist`(list,导轨行,`id` 即面板 id,`label` 是 thunk 所以标题随语言实时解析)与 `main`(keyed,面板体,由布局渲染在中央);两者都用 `ctx.slots.inject(key, …)` 等待 ui-layout / ui-sidebar 声明该席位。`tsdown` 构建为 `__ModuleLoader__` 惰性 CJS bundle(免额外依赖,React 由宿主外壳提供)。
 - **技能** (`skills/add-software-tool/`):经 `dsh-skill-filesystem` 的 `customSkillDirs` 挂载,只看插件自带目录,不干扰默认技能根。
 
 ## License
