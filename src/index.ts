@@ -69,7 +69,12 @@ export interface SoftwareTool {
  * a local ComfyUI...) belong in the *user* catalog —
  * `~/.dsh/software-tools/catalog.json` — where the `add-software-tool`
  * skill writes them; a user entry with the same id overrides a built-in.
- * Keep each `usage` to 1–2 actionable lines.
+ *
+ * `usage` is injected verbatim into every request, so it carries USAGE ONLY:
+ * how to reach the tool + the prerequisites a caller must know (≤5 lines).
+ * Tuning/ops/benchmark/history detail belongs in that tool's own docs, never
+ * here -- see the add-software-tool skill, which enforces this when entries
+ * are written or revised.
  */
 export const CATALOG: SoftwareTool[] = [
   {

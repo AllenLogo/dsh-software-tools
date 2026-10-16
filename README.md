@@ -15,7 +15,7 @@ A model (e.g. deepseek-v4-flash) has no idea that you have IDM, ComfyUI, Obsidia
 | 🔧 | Sidebar panel | Tools grouped by category; toggling takes effect on the model's very next request — no restart |
 | 📥 | Built-in + user catalog merge | Portable built-in catalog (aria2 / proxy / playwright / uvx / interop / zstd …); user entries in `catalog.json` override built-ins by id |
 | 🧠 | System-prompt injection | Checked tools become a compact section on every assembly (`systemPrompt.section`, same seam as persona / plan-mode) |
-| 🛠 | Bundled skill | Ships `add-software-tool`: the model learns to write newly installed software into the user catalog — no rebuild, no restart |
+| 🛠 | Bundled skill | Ships `add-software-tool`: the model learns to write newly installed software into the user catalog — no rebuild, no restart; entries are scoped to usage, not tuning |
 | 🔒 | Loopback RPC | Panel ↔ host over a loopback-pinned RPC channel; reads local JSON only |
 
 ## Install
@@ -58,7 +58,9 @@ All optional; zero-config by default:
 | `<settingsDir>/selection.json` | `{"ids": ["aria2", …]}` — current selection |
 | `<settingsDir>/catalog.json` | `{"tools": [entry…]}` — user catalog; same id overrides a built-in |
 
-Entry fields: `id` (`[a-z0-9-]{1,32}`, unique), `name`, `category` (`download`/`proxy`/`media`/`browser`/`knowledge`/`runtime`/`model`/`misc`), `desc` (≤40 chars), `usage` (1–2 actionable, directly executable lines).
+Entry fields: `id` (`[a-z0-9-]{1,32}`, unique), `name`, `category` (`download`/`proxy`/`media`/`browser`/`knowledge`/`runtime`/`model`/`misc`), `desc` (≤40 chars, panel only), `usage` (**≤5 directly executable lines**, injected into the system prompt).
+
+> **An entry is usage instructions only**: written for the session that is about to call the tool — what it is, when to use it, the first command to run. Tuning/ops/troubleshooting/history (VRAM gates, quantisation and KV flags, measured throughput, port-change steps, migration history…) does not belong here; it belongs in the tool's own docs (README / deploy report / cheat sheet), with at most a `details in <path>` pointer. The entry is injected on every request, so length is cost — and tuning needs far more context than a few lines.
 
 ## Adding a tool
 

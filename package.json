@@ -1,6 +1,6 @@
 {
   "name": "dsh-software-tools",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Sidebar 【软件工具】manager for DeepSeek Harness Web: a curated inventory of local WSL/Windows software tools; checked tools are injected into the model's system prompt as a compact section, so every session knows what software exists on this machine and how to call it. Ships the add-software-tool skill for adding new tools without a rebuild.",
   "keywords": [
     "deepseek",

@@ -17,7 +17,7 @@ A sidebar **软件工具** panel for DeepSeek Harness Web: maintain a curated in
 | 🎚 | 面板导轨入口 | 按分类列出工具目录,勾选即生效(无需重启,下一次请求即可见) |
 | 📥 | 内置 + 用户扩展合并 | 内置通用目录(aria2 / proxy / playwright / uvx / interop / zstd …);用户扩展 `catalog.json` 同 id 覆盖内置 |
 | 🧠 | 系统提示注入 | 勾选的工具以紧凑段落注入每个请求的 system prompt(`systemPrompt.section`,与 persona / plan-mode 同一机制) |
-| 🛠 | 内置 skill | 随插件自带 `add-software-tool` 技能:模型学会把新装软件写进用户目录,免重编译/重启 |
+| 🛠 | 内置 skill | 随插件自带 `add-software-tool` 技能:模型学会把新装软件写进用户目录,免重编译/重启;条目按"使用说明"口径收窄,不写调优 |
 | 🔒 | 回环 RPC | 面板↔宿主走 loopback 钉死的 RPC channel,读本地 JSON,不触碰网络 |
 
 ## 安装 / Install
@@ -60,7 +60,9 @@ dsh plugin --profile web add dsh-software-tools
 | `<settingsDir>/selection.json` | `{"ids": ["aria2", ...]}` — 当前勾选 |
 | `<settingsDir>/catalog.json` | `{"tools": [条目...]}` — 用户扩展目录;同 id 覆盖内置 |
 
-目录条目字段:`id`(`[a-z0-9-]{1,32}` 唯一)、`name`、`category`(download/proxy/media/browser/knowledge/runtime/model/misc)、`desc`(≤40 字)、`usage`(1–2 行可直接执行的调用法)。
+目录条目字段:`id`(`[a-z0-9-]{1,32}` 唯一)、`name`、`category`(download/proxy/media/browser/knowledge/runtime/model/misc)、`desc`(≤40 字,只在面板显示)、`usage`(**≤5 行、可直接执行的调用法**,注入系统提示)。
+
+> **条目只写"使用说明"**:写给"接下来要用这个工具的会话"——是什么、何时用、第一条命令敲什么。调优/运维/排障/沿革信息(显存门槛、KV/量化参数、实测吞吐、改端口步骤、迁移史…)不进条目,写进**该工具自己的文档**(README / 部署报告 / 指标速查),条目里最多留一句 `细节见 <路径>`。原因:条目每次请求都注入,长度即成本;调优所需上下文也远超几行。
 
 ## 添加新软件 / Adding a tool
 
