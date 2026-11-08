@@ -1,6 +1,6 @@
 {
   "name": "dsh-software-tools",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Sidebar 【软件工具】manager for DeepSeek Harness Web: a curated inventory of local WSL/Windows software tools; checked tools are injected into the model's system prompt as a compact section, so every session knows what software exists on this machine and how to call it. Ships the add-software-tool skill for adding new tools without a rebuild.",
   "keywords": [
     "deepseek",
@@ -30,18 +30,20 @@
     "./package.json": "./package.json"
   },
   "files": [
-    "lib/index.js",
-    "lib/client.js",
+    "lib/*.js",
+    "lib/*.js.map",
     "lib/types/**/*.d.ts",
     "src",
     "skills",
+    "scripts",
     "cordis.patch.yml",
+    "docs",
     "README.md",
     "README.zh.md",
     "LICENSE"
   ],
   "engines": {
-    "dsh": ">=0.2.0-rc.1",
+    "dsh": ">=0.2.2-rc.1",
     "node": ">=22"
   },
   "dsh": {
@@ -63,19 +65,20 @@
   },
   "scripts": {
     "build": "node -e \"fs.rmSync('lib',{recursive:true,force:true})\" && tsc -p tsconfig.json && tsdown && tsc -p tsconfig.client.json && tsc -p tsconfig.client.types.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json"
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json",
+    "check:local-config": "node scripts/guard-local-config.mjs"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "~4.0.4"
+    "@deepseek-ai/cordis": "~4.1.0"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "~4.0.4",
-    "@deepseek-ai/dsh-client-connection": "0.2.0-rc.1",
-    "@deepseek-ai/dsh-client-locale": "0.2.0-rc.1",
-    "@deepseek-ai/dsh-client-ui-renderer": "0.2.0-rc.1",
-    "@deepseek-ai/dsh-client-ui-settings": "0.2.0-rc.1",
-    "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.1",
-    "@deepseek-ai/dsh-system-prompt": "0.2.0-rc.1",
+    "@deepseek-ai/cordis": "~4.1.0",
+    "@deepseek-ai/dsh-client-connection": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-client-locale": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-settings": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-slots": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-system-prompt": "0.2.2-rc.1",
     "@types/node": "^24.0.0",
     "@types/react": "~18.3.1",
     "@types/react-dom": "~18.3.1",
@@ -83,7 +86,7 @@
     "react-dom": "^18.2.0",
     "tsdown": "^0.22.2",
     "typescript": "^5.6.0",
-    "@deepseek-ai/dsh-client-ui-layout": "0.2.0-rc.1",
-    "@deepseek-ai/dsh-client-ui-sidebar": "0.2.0-rc.1"
+    "@deepseek-ai/dsh-client-ui-layout": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-client-ui-sidebar": "0.2.2-rc.1"
   }
 }

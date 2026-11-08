@@ -19,7 +19,13 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Local config / path guard
+        run: pnpm run check:local-config
       - name: Typecheck
         run: pnpm run typecheck
       - name: Build
         run: pnpm run build
+      - name: lib/ is in sync with src/ (rebuild is committed)
+        run: |
+          git diff --exit-code -- lib
+          test -z "$(git status --porcelain -- lib)"

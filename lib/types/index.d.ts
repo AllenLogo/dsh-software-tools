@@ -11,15 +11,26 @@
  * instructions for the bash / shell tools it already has.
  *
  * State and catalog are served over a fenced RPC channel `/_dsh-software-tools`:
- *   - `list` → { catalog, selected, section }  (catalog + current selection)
- *   - `set`  → { ok }                          (persist new selection {ids})
+ *   - `list`   → { catalog, categoryLabels, selected, section, catalogError?, catalogWarnings? }
+ *                catalog rows carry `origin` (builtin | user | override) and
+ *                `readonly` (built-in rows cannot be deleted); `catalogError`
+ *                means the file cannot be parsed at all, `catalogWarnings`
+ *                lists unusable/duplicate rows that block add/remove
+ *   - `set`    → { selected }                    persist the checked ids {ids}
+ *   - `add`    → { id, origin, overwritten }     { name, desc, usage, category, id?, overwrite? }
+ *   - `remove` → { id, selectionUpdated, fallbackToBuiltin }   { id }
+ *
+ * `add`/`remove` write the user catalog (`catalog.json`) and, for `remove`, also
+ * drop the id from `selection.json`. Both back up the file they rewrite
+ * (`.bak.<YYYYMMDD-HHMMSS>`) and write atomically — see src/catalog.ts, which
+ * also holds the merge/validation logic so it can be tested without a host.
  *
  * The channel is mounted through src/channel-route.ts rather than
  * `ctx.connection.rpc.handle()`: that registry cannot work from a plugin -- it
  * reads `webServer` off the Connection service's own inject-gated context -- and
  * the throw only fails the `ctx.inject()` child fiber, leaving the channel
  * silently absent (the browser panel then shows 加载失败). Re-verified on DSH
- * 0.2.0-rc.1: with `ctx.inject(['connection'], ...)` the mount produces no route
+ * 0.2.2-rc.1: with `ctx.inject(['connection'], ...)` the mount produces no route
  * at all (`POST /_dsh-software-tools/list` answered by the static fallback as 405
  * instead of by the Connection fence as 401), exactly as documented in
  * src/channel-route.ts. Adding `webServer` to the caller's inject list does not
@@ -28,42 +39,13 @@
  * that file for the details.
  */
 import type { Context } from '@deepseek-ai/cordis';
+import type { SoftwareToolsConfig } from './catalog.js';
+export { CATALOG, CATEGORY_LABELS } from './catalog.js';
+export type { CatalogEntry, Category, SoftwareTool, SoftwareToolsConfig } from './catalog.js';
 export declare const name = "dsh-software-tools";
 export declare const inject: string[];
-/** Config accepted on the cordis entry (all optional). */
-export interface SoftwareToolsConfig {
-    /**
-     * Directory holding `selection.json` + `catalog.json`.
-     * Defaults to `$DSH_HOME/software-tools` (i.e. `~/.dsh/software-tools`).
-     */
-    settingsDir?: string;
-}
 export declare const CHANNEL = "/_dsh-software-tools";
 export declare const SECTION_NAME = "software-tools";
 /** Tool guidance sections conventionally live at 100–199; 200 lands after them. */
 export declare const SECTION_ORDER = 200;
-/** One entry in the curated inventory. */
-export interface SoftwareTool {
-    id: string;
-    name: string;
-    category: 'download' | 'proxy' | 'media' | 'browser' | 'knowledge' | 'runtime' | 'model' | 'misc';
-    desc: string;
-    usage: string;
-}
-/**
- * The curated catalog shipped with the plugin. Kept deliberately
- * machine-independent: entries here must hold for any WSL/Windows host.
- * Machine-specific tools (IDM's install path, an Obsidian vault location,
- * a local ComfyUI...) belong in the *user* catalog —
- * `~/.dsh/software-tools/catalog.json` — where the `add-software-tool`
- * skill writes them; a user entry with the same id overrides a built-in.
- *
- * `usage` is injected verbatim into every request, so it carries USAGE ONLY:
- * how to reach the tool + the prerequisites a caller must know (≤5 lines).
- * Tuning/ops/benchmark/history detail belongs in that tool's own docs, never
- * here -- see the add-software-tool skill, which enforces this when entries
- * are written or revised.
- */
-export declare const CATALOG: SoftwareTool[];
-export declare const CATEGORY_LABELS: Record<SoftwareTool['category'], string>;
 export declare function apply(ctx: Context, config?: SoftwareToolsConfig): void;

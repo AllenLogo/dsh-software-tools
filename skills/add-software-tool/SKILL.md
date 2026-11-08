@@ -32,11 +32,11 @@ description: 把新安装的软件(如软件 A)总结并加入 dsh 侧边栏【�
 | 内容 | 例子 |
 |---|---|
 | 一句话"是什么 / 何时用" | `本地语音转写,出 txt/srt/json` |
-| 从本机怎么调用(真实可执行) | `bash /mnt/f/ai-audio/tools/asr/asr.sh <音频或视频...>` |
+| 从本机怎么调用(真实可执行) | `bash /path/to/ai-audio/tools/asr/asr.sh <音频或视频...>` |
 | 调用前提 | 需先启动、需 API key、目标目录先建好、监听哪个端口 |
 | 资源冲突(决定"现在能不能用") | `需独占显存,与 Bonsai/LM Studio 不能同时常驻` |
 | 会直接踩坑的用法(一句话) | `必须走脚本,别自己起引擎`;`max_tokens 给小了会返回空 content` |
-| 深层文档路径(如有) | `参数/排障见 /home/allenlogo/bonsai/部署报告.md` |
+| 深层文档路径(如有) | `参数/排障见 /path/to/<tool>-notes.md` |
 
 ## 不该写(黑名单 → 挪进工具自己的文档)
 
@@ -49,7 +49,7 @@ description: 把新安装的软件(如软件 A)总结并加入 dsh 侧边栏【�
 | 历史沿革 | `9010(2026-09-25 从 8099 迁走)`、为什么这么配、版本变更原因 |
 | 排障方法 | 怎么查是谁占显存(`Get-Counter`)、报错怎么修 |
 
-这些信息是有效的——只是归属地是 `F:\Strata\_DEPLOY-NOTES.md`、`/home/allenlogo/bonsai/部署报告.md`、工具自带 README 这类文档。
+这些信息是有效的——只是归属地是 `C:\Tools\<tool>\_DEPLOY-NOTES.md`、`/path/to/<tool>-notes.md`、工具自带 README 这类文档。
 
 ## 机制(重要)
 
@@ -57,7 +57,10 @@ description: 把新安装的软件(如软件 A)总结并加入 dsh 侧边栏【�
 - **用户扩展目录文件**:`$DSH_HOME/software-tools/catalog.json`(JSON,形如 `{"tools": [条目...]}`;`$DSH_HOME` 默认 `~/.dsh`,插件 config 可用 `settingsDir` 覆盖)。
 - 写这个文件**无需重编译、无需重启、无需重装插件**——宿主每次读取都实时合并,刷新面板即可见。
 - 注入系统提示的形态是 `- <name>: <usage>` 一行;`desc` **只显示在面板里,不注入**。也就是说:写进 `usage` 的每个字,每轮请求都在付费。
+- **面板本身也能增删**:面板底部「+ 新增条目」(名称/说明/用法/分类)直接写入同一个 `catalog.json`;用户条目行内「删除」带二次确认,删除会先备份、并把该 id 从 `selection.json` 剔除。**内置条目只读不可删**;同 id 的用户条目被删后自动回落到内置版本。所以"只是把已知命令登记一下"可以让用户直接在面板里做,技能负责**需要先调研**的新软件。
 - **不要修改**插件的内置目录(在 `~/.dsh/profiles/web/node_modules/dsh-software-tools/` 里,升级会被覆盖)。
+- **本地状态的唯一落点是 `$DSH_HOME/software-tools/`(默认 `~/.dsh/software-tools/`),绝不写进插件仓库目录**。本仓库是公开仓库:把 `catalog.json`/`selection.json` 或任何本机路径写进仓库等于公开本机信息;`pnpm run check:local-config` 会在索引/暂存区里拦这些内容。
+- **面板表单只能新增用户条目**:它不提供覆盖,与已有 id 冲突会被拒绝。要**覆盖内置条目/替换已有用户条目**,只有显式 `id` + `overwrite: true` 的 `add` 调用这条路(即本技能或直接改 JSON 的路径);面板 UI 没有这个开关。
 
 ## 步骤
 
@@ -73,7 +76,7 @@ description: 把新安装的软件(如软件 A)总结并加入 dsh 侧边栏【�
 
 调研过程中一定会**顺带**学到调优/实测/踩坑内容——那些不属于条目,写进该工具自己的文档(已有文档就补进去),别往条目里堆。
 
-可用 `which`、`ls /mnt/c/...`、`curl 探活` 等确认;不确定的写"需确认",不要编造路径。
+可用 `which`、`ls <Windows 挂载点>/...`、`curl 探活` 等确认;不确定的写"需确认",不要编造路径。
 
 ### 2. 构造目录条目
 
@@ -87,27 +90,29 @@ description: 把新安装的软件(如软件 A)总结并加入 dsh 侧边栏【�
 }
 ```
 
-约束(校验规则,违反会出问题):
+约束(校验规则,违反会出问题)。**硬上限的权威口径在 README.md 的「Entry field limits」小节**(由宿主校验);下表只重复要点 + 写作目标,数值如有出入以 README 为准:
 
-| 字段 | 规则 |
-|---|---|
-| `id` | `[a-z0-9-]{1,32}`,全局唯一;与已有 id 相同 = **覆盖内置条目**(可用于修正内置用法) |
-| `name` | 显示名,带上用途括注,如 `ffmpeg (音视频处理)` |
-| `category` | 必须在上述枚举内(新软件不确定就选 `misc`) |
-| `desc` | 一句话(面板里单行显示),**尽量 ≤ 40 字、最长 ~60 字**,说明"何时用";不写参数、不写实测数字 |
-| `usage` | **≤ 5 行、≤ 约 600 字**:真实命令、完整路径、端口、调用前提;Windows 工具写清 interop 调用法,如 `cmd.exe /c "C:\\...\\工具.exe" /参数` 。**不含**调优参数、实测数字、运维步骤、历史沿革;有深层文档时末尾一句 `细节见 <路径>` |
+| 字段 | 硬上限(宿主校验) | 写作目标 |
+|---|---|---|
+| `id` | `[a-z0-9][a-z0-9._-]*`,≤64 字符,全局唯一 | 面板会自动生成并去重;与已有 id 相同 = **覆盖内置条目**(仅显式 `id` + `overwrite: true` 的调用可以做到,面板不提供) |
+| `name` | ≤200 字 | 显示名 + 用途括注,如 `ffmpeg (音视频处理)` |
+| `category` | 必须在上面的枚举内 | 新软件不确定就选 `misc` |
+| `desc` | ≤1000 字(面板里单行显示,不注入) | 一句话、约 40–60 字,说明"何时用";不写参数、不写实测数字 |
+| `usage` | ≤2000 字(每轮请求都注入) | ≤5 行、约 600 字:真实命令、端口、调用前提;Windows 工具写清 interop 调用法,如 `cmd.exe /c "C:\\Tools\\...\\工具.exe" /参数` 。**不含**调优参数、实测数字、运维步骤、历史沿革;有深层文档时末尾一句 `细节见 <路径>` |
 
 ### 3. 自检(写文件前逐条对照)
 
 1. 只看 `usage`,一个**没接触过**这个工具的会话能直接跑起来吗?
 2. 出现数字(GB / MiB / t/s / % )或 `--参数` 了吗?→ 那是调优,**挪走**。
 3. 出现"为什么 / 历史 / 迁移 / 排查 / 校验 / 回写"了吗?→ **删**。
-4. `desc` ≤ ~60 字、`usage` ≤ 5 行(约 600 字)吗?超了先砍示例,只留一条主用法 + 文档指针。
+4. `desc` ≤ ~60 字、`usage` ≤ 5 行(约 600 字)吗?超了先砍示例,只留一条主用法 + 文档指针(硬上限见 README「Entry field limits」:desc 1000 / usage 2000)。
 5. 被拦下来的调优内容,是否已经落在该工具自己的文档里?**没有 → 先补文档**,再在条目里留一句指针。
 
 ### 4. 写入文件
 
-用 read 读现有 `catalog.json`(不存在则视为空),按 `id` 合并(同 id 覆盖),写回 `{"tools": [...]}`;写完**用 python3/json 校验 JSON 合法**,并统计各字段字数确认没超预算。
+用 read 读现有 `catalog.json`(不存在则视为空),按 `id` 合并(同 id 覆盖),写回 `{"tools": [...]}`。**写前先备份**:把现有文件复制为 `catalog.json.bak.<YYYYMMDD-HHMMSS>`(与宿主同一惯例);**原子写**:先写同目录临时文件再 `mv` 覆盖,避免写一半截断目录。写完**用 python3/json 校验 JSON 合法**,并统计各字段字数确认没超预算。
+
+> 若 `catalog.json` 本身解析失败,先停下并告知用户修复(宿主会拒绝在坏文件上做增删,技能也不应覆盖它)。
 
 ### 5. 验证与告知
 
@@ -134,7 +139,7 @@ description: 把新安装的软件(如软件 A)总结并加入 dsh 侧边栏【�
   "name": "ffmpeg (音视频处理)",
   "category": "media",
   "desc": "命令行音视频转码/剪辑/合成工具,已安装。",
-  "usage": "转码:ffmpeg -i 输入.mp4 -c:v libx264 -preset fast 输出.mp4 ;查编码器:ffmpeg -encoders ;需要新编解码时用 Playwright 附带的新版:/home/allenlogo/.cache/ms-playwright/ffmpeg-1011/ffmpeg-linux -i 输入 -c:v libx264 输出。"
+  "usage": "转码:ffmpeg -i 输入.mp4 -c:v libx264 -preset fast 输出.mp4 ;查编码器:ffmpeg -encoders ;需要新编解码时用 Playwright 附带的新版:~/.cache/ms-playwright/<rev>/ffmpeg-linux -i 输入 -c:v libx264 输出。"
 }
 ```
 
@@ -142,22 +147,24 @@ description: 把新安装的软件(如软件 A)总结并加入 dsh 侧边栏【�
 
 ```text
 ✗ 启动:...;显存门槛:环境变量 STRATA_VRAM_MIN(MiB,默认 13000 硬门槛;低于 14800 只提示;设 0 跳过),
-   体检可单跑:...preflight_vram.py --min-mib 13000;...配置 F:\Strata\strata-iq3_s.json
+   体检可单跑:...preflight_vram.py --min-mib 13000;...配置 C:\Tools\Strata\strata-iq3_s.json
    (--max-context 262144、--kv int8、--kv-resident 32768、--pcie-frac 0.35...);
    显存实测(2026-10-16):KV streaming 常驻 32768 cell/层、KV 占 pinned RAM 3.09GiB...
 ```
 
 ```text
-✓ 启动:cmd.exe /c "F:\Strata\run-iq3_s.bat"(首次加载约 30-90 秒);
+✓ 启动:cmd.exe /c "C:\Tools\Strata\run-iq3_s.bat"(首次加载约 30-90 秒);
    就绪:curl -s http://127.0.0.1:8080/health(loaded:true);
    文本:/v1/chat/completions ... ;图像:content 加 image_url ... ;
    max_tokens 必须给足(推理模型,给小了会返回空 content);
-   启动前需先腾出显存,否则脚本拒绝启动;调优/参数/排障见 F:\Strata\_DEPLOY-NOTES.md。
+   启动前需先腾出显存,否则脚本拒绝启动;调优/参数/排障见 C:\Tools\Strata\_DEPLOY-NOTES.md。
 ```
 
 ## 注意
 
 - 一次只加一个软件;批量时逐个按此流程
 - 不要改内置目录文件、不要改插件源码
+- 用户只是想"把手头已知的命令登记进去"时,直接让用户在面板底部「+ 新增条目」填写即可,不必走调研流程
 - `usage` 里的命令必须是这台机器(或 Windows 侧)真实可用的,别写假设性命令
+- 写条目时**只写 `$DSH_HOME/software-tools/catalog.json`**;不要把本机绝对路径当示例写进插件仓库的文档/源码(用 `/path/to/...`、`C:\Tools\...` 这类通用占位)
 - **条目是"使用说明",不是"运维手册"**:调优信息进工具文档,条目里最多留一句指针
