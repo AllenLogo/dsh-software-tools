@@ -523,6 +523,75 @@ test('every built-in entry uses a known category', () => {
   for (const tool of CATALOG) assert.ok(CATEGORIES.includes(tool.category), `${tool.id}: ${tool.category}`)
 })
 
+/* ------------------------------------------------ built-in catalog cleanup */
+
+test('built-in catalog: the bogus proxy entry is gone (2.1 cleanup)', () => {
+  // The built-in `proxy` row asserted 127.0.0.1:7890 on every machine, but no
+  // such proxy exists on this host; a machine-specific endpoint does not belong
+  // in a portable built-in catalog. The `proxy` *category* stays available so a
+  // user can add their own row.
+  assert.equal(
+    CATALOG.some((tool) => tool.id === 'proxy'),
+    false,
+    'the hard-coded proxy row must not come back',
+  )
+  assert.ok(CATEGORIES.includes('proxy'), 'the proxy category itself is still valid')
+})
+
+test('built-in catalog: zstd documents the Python path, not a missing CLI (2.1 cleanup)', () => {
+  const zstd = CATALOG.find((tool) => tool.id === 'zstd')
+  assert.ok(zstd !== undefined)
+  const text = `${zstd.usage}\n${zstd.compact ?? ''}`
+  // This host has no `zstd` binary and no `fzstd` package; only Python's
+  // `zstandard` is installed. The entry must not send a caller down a dead end.
+  assert.doesNotMatch(text, /\bfzstd\b/, 'fzstd is not installed anywhere on this host')
+  // A `zstd -d` mention is acceptable only as a conditional fallback; the entry
+  // must not tell a caller to lead with a CLI this host does not have.
+  assert.doesNotMatch(text, /^\s*解压:zstd -d/m, 'the CLI must not be the primary decompress path')
+  assert.match(text, /python3/, 'the entry must name the interpreter that actually works')
+  assert.match(text, /zstandard/, 'the entry must name the installed package')
+  // Multi-frame session files cannot be read with a one-shot decompress.
+  assert.match(zstd.usage, /stream_reader/, 'multi-frame files need stream_reader')
+})
+
+test('built-in catalog: no entry claims a machine-specific proxy port', () => {
+  for (const tool of CATALOG) {
+    const text = `${tool.usage}\n${tool.compact ?? ''}`
+    assert.doesNotMatch(
+      text,
+      /127\.0\.0\.1:7890/,
+      `${tool.id} hard-codes a proxy port that does not exist on every host`,
+    )
+  }
+})
+
+test('built-in catalog: entries stay machine-independent (no "本机" claims)', () => {
+  // Built-ins must hold for ANY WSL/Windows host (see the CATALOG doc comment).
+  // A phrase like "本机没有 zstd CLI" states a fact about one machine and would
+  // be wrong on a host that has the CLI, so built-ins must be conditional.
+  for (const tool of CATALOG) {
+    const text = `${tool.desc}\n${tool.usage}\n${tool.compact ?? ''}`
+    assert.doesNotMatch(
+      text,
+      /本机没有|本机无|this machine (?:has no|does not have)/i,
+      `${tool.id} asserts a fact about one specific machine`,
+    )
+  }
+})
+
+test('built-in catalog: a compact line is self-sufficient (no "see usage" pointer)', () => {
+  // In compact mode the model sees ONLY the compact text — a pointer to `usage`
+  // would send it to text it cannot see, which is how a tool becomes unusable.
+  for (const tool of CATALOG) {
+    const compact = tool.compact ?? ''
+    assert.doesNotMatch(
+      compact,
+      /见用法|see usage|完整命令见/,
+      `${tool.id}: compact must stand alone, not point at usage`,
+    )
+  }
+})
+
 /* -------------------------------------------------------------- render mode */
 
 test('readRenderMode: missing file defaults to full', async () => {
@@ -629,6 +698,24 @@ test('writeSelected: an empty selection matches a missing file and is not rewrit
 })
 
 /* ------------------------------------------------------- end-to-end budget */
+
+test('built-in-only compact section stays within the 2.1 cleanup budget', () => {
+  // Regression guard for the 2.1 catalog cleanup: correcting the zstd entry (it
+  // used to name a CLI and a package that do not exist) costs real characters,
+  // so the built-in-only compact section is pinned here. If a future edit pushes
+  // it past the budget, this fails instead of silently drifting.
+  const ids = CATALOG.map((tool) => tool.id)
+  const compact = renderSection({}, ids, 'compact')
+  const full = renderSection({}, ids, 'full')
+  assert.ok(compact.length > 0)
+  assert.ok(compact.length < full.length)
+  // 6 built-ins as of the 2.1 cleanup. The headroom is deliberately small; see
+  // docs/v0.5-REPORT.md §10 for why the corrected zstd line is worth its cost.
+  assert.ok(
+    compact.length <= 2100,
+    `built-in-only compact section grew to ${compact.length} chars (budget 2100)`,
+  )
+})
 
 test('end-to-end: compact mode renders a built-in-only selection smaller than full', async () => {
   await withDir((dir) => {

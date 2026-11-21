@@ -110,8 +110,8 @@ export const CATALOG: SoftwareTool[] = [
     name: 'aria2 (命令行多线程下载)',
     category: 'download',
     desc: 'WSL 内多线程下载器,已安装。',
-    usage: 'aria2c -x 16 -s 16 -k 1M <URL> ;慢时加 --all-proxy=http://127.0.0.1:7890 。',
-    compact: 'aria2c -x 16 -s 16 -k 1M <URL> ;慢时加 --all-proxy=http://127.0.0.1:7890 。',
+    usage: 'aria2c -x 16 -s 16 -k 1M <URL> ;慢时加 --all-proxy=<本机代理地址> (代理端口各机不同,先确认再填)。',
+    compact: 'aria2c -x 16 -s 16 -k 1M <URL> ;慢时加 --all-proxy=<本机代理地址> 。',
   },
   {
     id: 'hf-mirror',
@@ -120,14 +120,6 @@ export const CATALOG: SoftwareTool[] = [
     desc: 'HuggingFace 国内镜像,下载大模型免代理。',
     usage: '设环境变量 HF_ENDPOINT=https://hf-mirror.com 后用 huggingface-cli / aria2 下载模型。',
     compact: '设 HF_ENDPOINT=https://hf-mirror.com 后用 huggingface-cli / aria2 下载。',
-  },
-  {
-    id: 'proxy',
-    name: '本机代理 (常见 Clash 127.0.0.1:7890)',
-    category: 'proxy',
-    desc: '本机 HTTP/SOCKS 代理;WSL mirrored 网络下可用 127.0.0.1 直连 Windows 侧端口。',
-    usage: 'curl/aria2/git 等加 --all-proxy=http://127.0.0.1:7890 或 export https_proxy=http://127.0.0.1:7890 ;具体端口以本机实际代理配置为准。',
-    compact: 'curl/git 等加 --all-proxy=http://127.0.0.1:7890 ;端口以本机实际代理为准。',
   },
   {
     id: 'playwright',
@@ -155,11 +147,11 @@ export const CATALOG: SoftwareTool[] = [
   },
   {
     id: 'zstd',
-    name: 'zstd / fzstd (压缩)',
+    name: 'zstd (压缩)',
     category: 'misc',
-    desc: '会话文件是 zstd 多帧 JSONL,解压/压缩工具。',
-    usage: 'node 用 fzstd(node_modules/fzstd)decompress;或命令行 zstd -d。',
-    compact: 'node 用 fzstd decompress;或命令行 zstd -d 。',
+    desc: '会话文件是 zstd 多帧 JSONL;没有 zstd CLI 时用 Python 的 zstandard 包读写。',
+    usage: '解压:python3 -c "import zstandard as z,sys;sys.stdout.buffer.write(z.ZstdDecompressor().stream_reader(sys.stdin.buffer).read())" < 文件.jsonl.zstd > 输出.jsonl ;压缩:python3 -c "import zstandard as z,sys;sys.stdout.buffer.write(z.ZstdCompressor().compress(sys.stdin.buffer.read()))" < 输入.jsonl > 输出.jsonl.zstd 。多帧文件必须用 stream_reader,不能一次性 decompress;装了 zstd CLI 时也可 zstd -d 。',
+    compact: '无 zstd CLI 时解压:python3 -c "import zstandard as z,sys;sys.stdout.buffer.write(z.ZstdDecompressor().stream_reader(sys.stdin.buffer).read())" < 文件.zst 。',
   },
 ]
 
