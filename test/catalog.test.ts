@@ -571,6 +571,53 @@ test('writeSelected: an unchanged selection is not rewritten', async () => {
   })
 })
 
+test('removeTool: deleting a checked entry keeps the compact mode (regression)', async () => {
+  await withDir((dir) => {
+    // A delete rewrites selection.json. It must carry the mode over — dropping
+    // it silently turned compact mode off and doubled the injected section.
+    assert.ok(addTool(cfg(dir), row({ name: 'Doomed', id: 'doomed' })).ok)
+    writeSelected(cfg(dir), ['doomed', 'aria2'])
+    writeRenderMode(cfg(dir), 'compact')
+    assert.equal(readRenderMode(cfg(dir)), 'compact')
+
+    const result = removeTool(cfg(dir), { id: 'doomed' })
+    assert.ok(result.ok)
+    assert.equal(result.selectionUpdated, true)
+    assert.deepEqual(readSelected(cfg(dir)), ['aria2'])
+    assert.equal(readRenderMode(cfg(dir)), 'compact', 'mode must survive a delete')
+  })
+})
+
+test('every selection.json writer carries the mode over (regression)', async () => {
+  await withDir((dir) => {
+    // The three paths that write selection.json must agree: ids-only writes
+    // (toggle / batch), mode-only writes (switch), and the delete path.
+    assert.ok(addTool(cfg(dir), row({ name: 'Victim', id: 'victim' })).ok)
+    writeSelected(cfg(dir), ['victim'])
+    writeRenderMode(cfg(dir), 'compact')
+
+    writeSelected(cfg(dir), ['victim', 'aria2']) // toggle / batch path
+    assert.equal(readRenderMode(cfg(dir)), 'compact')
+
+    writeRenderMode(cfg(dir), 'full') // mode switch path
+    assert.deepEqual(readSelected(cfg(dir)), ['victim', 'aria2'])
+
+    writeRenderMode(cfg(dir), 'compact')
+    assert.ok(removeTool(cfg(dir), { id: 'victim' }).ok) // delete path
+    assert.equal(readRenderMode(cfg(dir)), 'compact')
+    assert.deepEqual(readSelected(cfg(dir)), ['aria2'])
+  })
+})
+
+test('a default mode is not written to the file (keeps the v0.4 shape)', async () => {
+  await withDir((dir) => {
+    writeSelected(cfg(dir), ['aria2'])
+    const raw = JSON.parse(readFileSync(join(dir, 'selection.json'), 'utf8')) as Record<string, unknown>
+    assert.deepEqual(Object.keys(raw).sort(), ['ids'])
+    assert.equal(readRenderMode(cfg(dir)), 'full')
+  })
+})
+
 test('writeSelected: an empty selection matches a missing file and is not rewritten', async () => {
   await withDir((dir) => {
     // A missing selection.json already reads as `[]`, so persisting `[]` is a

@@ -452,6 +452,32 @@ export function readRenderMode(config: Partial<SoftwareToolsConfig>): RenderMode
 }
 
 /**
+ * The one place `selection.json` is written.
+ *
+ * `selection.json` carries two independent fields — `ids` (the checked set) and
+ * `mode` (the injection mode) — and every writer owns only one of them. Routing
+ * all writes through here is what keeps that true: each caller passes just the
+ * field it changes, and the other is read back and carried over. Writing
+ * `{ ids }` directly from a caller is how the mode got silently dropped by
+ * `removeTool` (a delete turned compact mode off, doubling the injected
+ * section), so callers must not build the object themselves.
+ *
+ * A `mode: 'full'` is normalised to "no `mode` key", keeping the file identical
+ * to what v0.4 wrote when the mode is the default.
+ */
+function writeSelection(
+  config: Partial<SoftwareToolsConfig>,
+  patch: { ids?: string[]; mode?: RenderMode },
+): boolean {
+  const ids = patch.ids ?? readSelected(config)
+  const mode = patch.mode ?? readRenderMode(config)
+  const file = selectionFile(config)
+  backupFile(file)
+  writeJson(file, mode === 'full' ? { ids } : { ids, mode })
+  return true
+}
+
+/**
  * Persist the injection mode next to the checked ids. The ids are preserved
  * verbatim (this endpoint never touches the selection) and an unchanged mode
  * does not rewrite the file, so repeated clicks spawn no backup files.
@@ -459,10 +485,7 @@ export function readRenderMode(config: Partial<SoftwareToolsConfig>): RenderMode
  */
 export function writeRenderMode(config: Partial<SoftwareToolsConfig>, mode: RenderMode): boolean {
   if (readRenderMode(config) === mode) return false
-  const file = selectionFile(config)
-  backupFile(file)
-  writeJson(file, { ids: readSelected(config), mode })
-  return true
+  return writeSelection(config, { mode })
 }
 
 /** Checked ids, in the persisted order. Missing/unreadable → empty. */
@@ -485,11 +508,7 @@ export function readSelected(config: Partial<SoftwareToolsConfig>): string[] {
 export function writeSelected(config: Partial<SoftwareToolsConfig>, ids: string[]): boolean {
   const current = readSelected(config)
   if (current.length === ids.length && current.every((id, index) => id === ids[index])) return false
-  const file = selectionFile(config)
-  const mode = readRenderMode(config)
-  backupFile(file)
-  writeJson(file, { ids, mode })
-  return true
+  return writeSelection(config, { ids })
 }
 
 /** The text injected for one tool: `compact` in compact mode (when present), else `usage`. */
@@ -742,10 +761,9 @@ export function removeTool(config: Partial<SoftwareToolsConfig>, input: unknown)
   const selected = readSelected(config)
   const kept = selected.filter((x) => x !== id)
   const selectionUpdated = kept.length !== selected.length
-  if (selectionUpdated) {
-    backupFile(selectionFile(config))
-    writeJson(selectionFile(config), { ids: kept })
-  }
+  // Goes through writeSelection so the persisted `mode` survives: deleting a row
+  // must not silently turn compact mode off (that would double the section).
+  if (selectionUpdated) writeSelection(config, { ids: kept })
 
   return {
     ok: true,

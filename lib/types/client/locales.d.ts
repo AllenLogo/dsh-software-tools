@@ -8,13 +8,12 @@ export declare const zh: {
     readonly selectHint: "已勾选 {n} 个工具";
     readonly sectionLabel: "注入段落预览";
     readonly budgetLabel: "已注入 {chars} 字 ≈ {tokens} token";
-    readonly budgetModeFull: "完整";
-    readonly budgetModeCompact: "精简";
     readonly budgetOverWarn: "已超过 {limit} 字预算,建议开精简模式或减少勾选";
+    readonly budgetOverTarget: "已超过 {limit} 字设计目标(仍可用,但每轮都在付费)";
     readonly budgetLongRow: "{n} 条超过 {limit} 字";
     readonly compactToggle: "精简模式";
     readonly compactHint: "精简模式注入每条目的 compact 短句(缺失则回落用法),实时对比两种模式的开销。";
-    readonly compactCost: "完整 {full} 字 · 精简 {compact} 字";
+    readonly compactCost: "完整 {fullChars} 字 ≈{fullTokens} token · 精简 {compactChars} 字 ≈{compactTokens} token";
     readonly compactMissing: "未填";
     readonly fieldCompact: "精简句";
     readonly fieldCompactPh: "≤200 字:一句话说清它是什么 + 第一条命令(精简模式注入;留空回落用法)";

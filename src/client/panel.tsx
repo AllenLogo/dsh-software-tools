@@ -53,7 +53,15 @@ interface Loaded {
 
 const EMPTY_DRAFT: AddPayload = { name: '', desc: '', usage: '', category: 'misc' }
 
-/** Header budget (1.2): above this many injected chars the counter turns red. */
+/**
+ * Two budget tiers, both shown in the header (1.2):
+ *   - `TARGET` is the v0.5 design target for a full selection. Crossing it means
+ *     the section is no longer "cheap", so it is flagged early — without it the
+ *     ≤2000 goal was a one-off measurement that any extra entry could break.
+ *   - `INJECTION_BUDGET_CHARS` is the hard warning threshold from the task list.
+ * The header colour follows the hard tier; the target tier is an amber notice.
+ */
+const TARGET_CHARS = 2000
 const INJECTION_BUDGET_CHARS = 8000
 /** Per-row flag (1.2): a single injected line longer than this is marked. */
 const ROW_BUDGET_CHARS = 300
@@ -91,6 +99,22 @@ function rowText(tool: SoftwareTool, mode: RenderMode): string {
 /** `- <name>: <text>` — the exact line the host renders, so counts match. */
 function rowLine(tool: SoftwareTool, mode: RenderMode): string {
   return `- ${tool.name}: ${rowText(tool, mode)}`
+}
+
+/**
+ * Format the two-mode cost line: chars AND estimated tokens for each mode, so
+ * the switch shows the real saving rather than just a character count.
+ */
+function costText(
+  t: (key: string) => string,
+  full: number,
+  compact: number,
+): string {
+  return t('compactCost')
+    .replace('{fullChars}', String(full))
+    .replace('{fullTokens}', String(estimateTokens(full)))
+    .replace('{compactChars}', String(compact))
+    .replace('{compactTokens}', String(estimateTokens(compact)))
 }
 
 function loadData(call: CallFn): Promise<Loaded> {
@@ -310,6 +334,7 @@ export function SoftwareToolsPanel({ call, t, close }: PanelProps) {
 
   const injectedChars = mode === 'compact' ? sectionForMode.compact.length : sectionForMode.full.length
   const overBudget = injectedChars > INJECTION_BUDGET_CHARS
+  const overTarget = injectedChars > TARGET_CHARS
   const longRows = visible.filter((entry) => rowText(entry, mode).length > ROW_BUDGET_CHARS)
   const visibleChecked = visible.filter((entry) => data?.selected.includes(entry.id) === true)
   const categoryCheckedAll = visible.length > 0 && visibleChecked.length === visible.length
@@ -319,7 +344,16 @@ export function SoftwareToolsPanel({ call, t, close }: PanelProps) {
       <div className="dst_head">
         <h2 className="dst_headTitle">{t('panelTitle')}</h2>
         <span className="dst_headHint">{t('panelHint')}</span>
-        <span className={`dst_budget${overBudget ? ' dst_budgetOver' : ''}`} title={overBudget ? t('budgetOverWarn').replace('{limit}', String(INJECTION_BUDGET_CHARS)) : undefined}>
+        <span
+          className={`dst_budget${overBudget ? ' dst_budgetOver' : overTarget ? ' dst_budgetNear' : ''}`}
+          title={
+            overBudget
+              ? t('budgetOverWarn').replace('{limit}', String(INJECTION_BUDGET_CHARS))
+              : overTarget
+                ? t('budgetOverTarget').replace('{limit}', String(TARGET_CHARS))
+                : undefined
+          }
+        >
           {t('budgetLabel')
             .replace('{chars}', String(injectedChars))
             .replace('{tokens}', String(estimateTokens(injectedChars)))}
@@ -343,12 +377,12 @@ export function SoftwareToolsPanel({ call, t, close }: PanelProps) {
           <span>{t('compactToggle')}</span>
         </label>
         <span className="dst_modeCost">
-          {t('compactCost')
-            .replace('{full}', String(sectionForMode.full.length))
-            .replace('{compact}', String(sectionForMode.compact.length))}
+          {costText(t, sectionForMode.full.length, sectionForMode.compact.length)}
         </span>
         {overBudget ? (
           <span className="dst_budgetWarn">{t('budgetOverWarn').replace('{limit}', String(INJECTION_BUDGET_CHARS))}</span>
+        ) : overTarget ? (
+          <span className="dst_budgetWarn">{t('budgetOverTarget').replace('{limit}', String(TARGET_CHARS))}</span>
         ) : null}
         {longRows.length > 0 ? (
           <span className="dst_budgetWarn">
@@ -603,7 +637,7 @@ export function SoftwareToolsPanel({ call, t, close }: PanelProps) {
       {data !== null && data.section !== '' ? (
         <details className="dst_section">
           <summary>
-            {t('sectionLabel')} · {t('compactCost').replace('{full}', String(sectionForMode.full.length)).replace('{compact}', String(sectionForMode.compact.length))}
+            {t('sectionLabel')} · {costText(t, sectionForMode.full.length, sectionForMode.compact.length)}
           </summary>
           <pre className="dst_sectionPre">{data.section}</pre>
         </details>

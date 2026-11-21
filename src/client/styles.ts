@@ -14,6 +14,7 @@ export const css = `
 .dst_count{color:var(--dsw-alias-label-secondary,#8a8f9c);font-size:11px;white-space:nowrap}
 .dst_budget{font-family:ui-monospace,Consolas,monospace;font-size:11px;color:var(--dsw-alias-state-business-primary,#4353a3);background:var(--dsw-alias-state-business-secondary,#eef2ff);border:1px solid var(--dsw-alias-state-business-tertiary,#dde3f8);border-radius:99px;padding:2px 8px;white-space:nowrap;flex:none}
 .dst_budgetOver{color:#b03a3a;background:var(--dsw-alias-state-warning-secondary,#fdf3e2);border-color:#f0b4b4;font-weight:600}
+.dst_budgetNear{color:#9a6412;background:var(--dsw-alias-state-warning-secondary,#fdf3e2);border-color:#f0dfc0}
 .dst_modeBar{display:flex;align-items:center;gap:10px;padding:6px 16px;background:var(--dsw-alias-bg-layer-1,#f7f8fa);border-bottom:1px solid var(--dsw-alias-border-l1,#e5e7eb);flex-wrap:wrap;flex:none}
 .dst_modeToggle{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--dsw-alias-label-secondary,#5f6672);cursor:pointer;flex:none}
 .dst_modeToggle input{cursor:pointer;margin:0}
