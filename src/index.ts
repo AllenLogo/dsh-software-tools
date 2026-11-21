@@ -11,12 +11,17 @@
  * instructions for the bash / shell tools it already has.
  *
  * State and catalog are served over a fenced RPC channel `/_dsh-software-tools`:
- *   - `list`   → { catalog, categoryLabels, selected, section, catalogError?, catalogWarnings? }
+ *   - `list`   → { catalog, categoryLabels, selected, section, mode,
+ *                sectionFull, sectionCompact, catalogError?, catalogWarnings? }
  *                catalog rows carry `origin` (builtin | user | override) and
  *                `readonly` (built-in rows cannot be deleted); `catalogError`
  *                means the file cannot be parsed at all, `catalogWarnings`
- *                lists unusable/duplicate rows that block add/remove
+ *                lists unusable/duplicate rows that block add/remove.
+ *                `section` is the text injected right now (per `mode`);
+ *                `sectionFull` / `sectionCompact` are both renderings, so the
+ *                panel can show the cost of each without a round trip
  *   - `set`    → { selected }                    persist the checked ids {ids}
+ *                or the injection mode {mode}; the other field is preserved
  *   - `add`    → { id, origin, overwritten }     { name, desc, usage, category, id?, overwrite? }
  *   - `remove` → { id, selectionUpdated, fallbackToBuiltin }   { id }
  *
@@ -47,16 +52,19 @@ import {
   CATALOG,
   CATEGORY_LABELS,
   addTool,
+  isRenderMode,
   mergedCatalog,
+  readRenderMode,
   readSelected,
   removeTool,
   renderSection,
+  writeRenderMode,
   writeSelected,
 } from './catalog.js'
-import type { SoftwareToolsConfig } from './catalog.js'
+import type { RenderMode, SoftwareToolsConfig } from './catalog.js'
 
 export { CATALOG, CATEGORY_LABELS } from './catalog.js'
-export type { CatalogEntry, Category, SoftwareTool, SoftwareToolsConfig } from './catalog.js'
+export type { CatalogEntry, Category, RenderMode, SoftwareTool, SoftwareToolsConfig } from './catalog.js'
 
 export const name = 'dsh-software-tools'
 export const inject = ['systemPrompt']
@@ -72,13 +80,14 @@ function failure(code: string, message: string): { ok: false; error: { code: str
 }
 
 export function apply(ctx: Context, config: SoftwareToolsConfig = {}): void {
-  // 1) Prompt section: evaluated at every assembly, so a selection change is
-  //    visible on the model's very next request without any restart.
+  // 1) Prompt section: evaluated at every assembly, so a selection change (or a
+  //    mode switch) is visible on the model's very next request without any
+  //    restart. The mode is read from selection.json on each assembly.
   ctx.effect(() =>
     ctx.systemPrompt.section({
       name: SECTION_NAME,
       order: SECTION_ORDER,
-      text: () => renderSection(config, readSelected(config)),
+      text: () => renderSection(config, readSelected(config), readRenderMode(config)),
     }),
     'dsh-software-tools: system prompt section',
   )
@@ -93,30 +102,50 @@ export function apply(ctx: Context, config: SoftwareToolsConfig = {}): void {
         if (endpoint === 'list') {
           const merged = mergedCatalog(config)
           const selected = readSelected(config)
+          const mode = readRenderMode(config)
           return {
             ok: true,
             value: {
               catalog: merged.entries,
               categoryLabels: CATEGORY_LABELS,
               selected,
-              section: renderSection(config, selected),
+              mode,
+              section: renderSection(config, selected, mode),
+              sectionFull: renderSection(config, selected, 'full'),
+              sectionCompact: renderSection(config, selected, 'compact'),
               ...(merged.error !== undefined ? { catalogError: merged.error } : {}),
               ...(merged.warnings.length > 0 ? { catalogWarnings: merged.warnings } : {}),
             },
           }
         }
         if (endpoint === 'set') {
-          const ids = (payload as { ids?: unknown } | undefined)?.ids
-          if (!Array.isArray(ids) || ids.some((x) => typeof x !== 'string')) {
-            return failure('bad-request', 'ids must be an array of strings')
+          const body = payload as { ids?: unknown; mode?: unknown } | undefined
+          // `set` owns two independent fields: the checked ids and the injection
+          // mode. Each is written only when present, so a batch toggle (1.3) and
+          // a mode switch never clobber each other.
+          const hasIds = body?.ids !== undefined
+          const hasMode = body?.mode !== undefined
+          if (!hasIds && !hasMode) return failure('bad-request', 'set needs ids or mode')
+          if (hasIds) {
+            const ids = body?.ids
+            if (!Array.isArray(ids) || ids.some((x) => typeof x !== 'string')) {
+              return failure('bad-request', 'ids must be an array of strings')
+            }
+            const known = new Set(mergedCatalog(config).entries.map((entry) => entry.id))
+            const unknown = (ids as string[]).filter((id) => !known.has(id))
+            if (unknown.length > 0) {
+              return failure('bad-request', `unknown tool ids: ${unknown.join(', ')}`)
+            }
           }
-          const known = new Set(mergedCatalog(config).entries.map((entry) => entry.id))
-          const unknown = (ids as string[]).filter((id) => !known.has(id))
-          if (unknown.length > 0) {
-            return failure('bad-request', `unknown tool ids: ${unknown.join(', ')}`)
+          if (hasMode && !isRenderMode(body?.mode)) {
+            return failure('bad-request', 'mode must be "full" or "compact"')
           }
-          writeSelected(config, ids as string[])
-          return { ok: true, value: { selected: ids as string[] } }
+          if (hasIds) writeSelected(config, body?.ids as string[])
+          if (hasMode) writeRenderMode(config, body?.mode as RenderMode)
+          return {
+            ok: true,
+            value: { selected: readSelected(config), mode: readRenderMode(config) },
+          }
         }
         if (endpoint === 'add') {
           const result = addTool(config, payload)

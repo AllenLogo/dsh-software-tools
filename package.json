@@ -1,6 +1,6 @@
 {
   "name": "dsh-software-tools",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Sidebar 【软件工具】manager for DeepSeek Harness Web: a curated inventory of local WSL/Windows software tools; checked tools are injected into the model's system prompt as a compact section, so every session knows what software exists on this machine and how to call it. Ships the add-software-tool skill for adding new tools without a rebuild.",
   "keywords": [
     "deepseek",
@@ -65,7 +65,8 @@
   },
   "scripts": {
     "build": "node -e \"fs.rmSync('lib',{recursive:true,force:true})\" && tsc -p tsconfig.json && tsdown && tsc -p tsconfig.client.json && tsc -p tsconfig.client.types.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json && tsc -p tsconfig.test.json",
+    "test": "node --test \"test/**/*.test.ts\"",
     "check:local-config": "node scripts/guard-local-config.mjs"
   },
   "peerDependencies": {

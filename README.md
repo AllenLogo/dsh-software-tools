@@ -18,6 +18,9 @@ A model (e.g. deepseek-v4-flash) has no idea that you have IDM, ComfyUI, Obsidia
 | 📥 | Built-in + user catalog merge | Portable built-in catalog (aria2 / proxy / playwright / uvx / interop / zstd …); user entries in `catalog.json` override built-ins by id |
 | ✏️ | Panel editing | Add one entry from the panel footer (**+ Add entry**: name / description / usage / category) and delete a user row inline with a confirmation; built-in rows are read-only. Deleting backs up `catalog.json`, unchecks the id, and reveals the built-in version again when the row overrode one |
 | 🧠 | System-prompt injection | Checked tools become a compact section on every assembly (`systemPrompt.section`, same seam as persona / plan-mode) |
+| 🪶 | Compact mode | A per-entry `compact` line plus a panel switch: the section drops to ~35% of its full size, and the header shows the live cost of both modes |
+| 📊 | Injection budget | The panel header always shows "N chars ≈ N tokens"; over 8000 chars turns red, and a single injected line over 300 chars is flagged on its row |
+| ☑️ | Batch selection | Per-category **Check all / Clear** writes the whole category in **one** `set` call |
 | 🛠 | Bundled skill | Ships `add-software-tool`: the model learns to write newly installed software into the user catalog — no rebuild, no restart; entries are scoped to usage, not tuning |
 | 🔒 | Loopback RPC | Panel ↔ host over a loopback-pinned RPC channel; reads local JSON only |
 
@@ -71,7 +74,8 @@ This table is the **authoritative** limit list (hard caps are host-enforced, see
 | `name` | ≤200 chars | display name + purpose, e.g. `ffmpeg (audio/video)` |
 | `category` | one of `download` / `proxy` / `media` / `browser` / `knowledge` / `runtime` / `model` / `misc` | `misc` when unsure |
 | `desc` | ≤1000 chars (panel only, never injected) | one line, ~40–60 chars: "what it is / when to use it" |
-| `usage` | ≤2000 chars (injected on **every** request) | ≤5 executable lines, ~600 chars: command + prerequisites |
+| `usage` | ≤2000 chars (injected on **every** request in full mode) | ≤5 executable lines, ~600 chars: command + prerequisites |
+| `compact` | ≤200 chars (injected in **compact mode**; optional) | one line, ~100 chars: what it is + the first command. Absent → `usage` is injected instead |
 
 Every write to `catalog.json` / `selection.json` is first copied to `<file>.bak.<YYYYMMDD-HHMMSS>` (the newest 20 backups per file are kept) and then written atomically (temp file + rename), so a crash mid-write cannot truncate the catalog. A user catalog that cannot be **fully** understood is never rewritten: invalid JSON is reported as `catalogError`, while individual rows that fail validation (missing `id`/`name`/`desc`/`usage`/`category`) are kept untouched in the file and reported as `catalogWarnings`; the panel shows either warning and disables add/remove until the file is fixed. Duplicate ids are de-duplicated (last row wins) and reported as a warning too.
 

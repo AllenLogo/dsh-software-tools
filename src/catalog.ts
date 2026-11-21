@@ -5,7 +5,7 @@
  *
  * Files, matching the established layout of an existing state directory:
  *   <stateDir>/catalog.json    { "tools": [entry…] }  user entries; same id overrides a built-in
- *   <stateDir>/selection.json  { "ids": ["aria2", …] }  checked tools
+ *   <stateDir>/selection.json  { "ids": ["aria2", …], "mode": "full" | "compact" }  checked tools + injection mode
  *
  * Every write is (1) preceded by a sibling `<file>.bak.<YYYYMMDD-HHMMSS>` copy
  * (the convention the state directory already carries; the newest backups are
@@ -49,6 +49,26 @@ export interface SoftwareTool {
   category: Category
   desc: string
   usage: string
+  /**
+   * Short form injected instead of `usage` when the selection is in `compact`
+   * mode: what the tool is + the one command that decides how to call it.
+   * Optional — a missing `compact` falls back to `usage` (see
+   * {@link renderSection}), so existing catalogs keep working unchanged.
+   */
+  compact?: string
+}
+
+/**
+ * Which field is injected into the system prompt.
+ *   - `full`    → `usage` (the complete invocation recipe)
+ *   - `compact` → `compact`, falling back to `usage` per entry when absent
+ */
+export type RenderMode = 'full' | 'compact'
+
+export const RENDER_MODES: readonly RenderMode[] = ['full', 'compact']
+
+export function isRenderMode(value: unknown): value is RenderMode {
+  return value === 'full' || value === 'compact'
 }
 
 /**
@@ -78,6 +98,11 @@ export interface CatalogEntry extends SoftwareTool {
  * Tuning/ops/benchmark/history detail belongs in that tool's own docs, never
  * here -- see the add-software-tool skill, which enforces this when entries
  * are written or revised.
+ *
+ * `compact` is the smaller sibling injected when the panel's 精简模式 is on: the
+ * one line that decides *whether and how* to call the tool. Every built-in and
+ * every user entry is expected to carry one; a missing `compact` falls back to
+ * `usage` (never a blank line).
  */
 export const CATALOG: SoftwareTool[] = [
   {
@@ -86,6 +111,7 @@ export const CATALOG: SoftwareTool[] = [
     category: 'download',
     desc: 'WSL 内多线程下载器,已安装。',
     usage: 'aria2c -x 16 -s 16 -k 1M <URL> ;慢时加 --all-proxy=http://127.0.0.1:7890 。',
+    compact: 'aria2c -x 16 -s 16 -k 1M <URL> ;慢时加 --all-proxy=http://127.0.0.1:7890 。',
   },
   {
     id: 'hf-mirror',
@@ -93,6 +119,7 @@ export const CATALOG: SoftwareTool[] = [
     category: 'download',
     desc: 'HuggingFace 国内镜像,下载大模型免代理。',
     usage: '设环境变量 HF_ENDPOINT=https://hf-mirror.com 后用 huggingface-cli / aria2 下载模型。',
+    compact: '设 HF_ENDPOINT=https://hf-mirror.com 后用 huggingface-cli / aria2 下载。',
   },
   {
     id: 'proxy',
@@ -100,6 +127,7 @@ export const CATALOG: SoftwareTool[] = [
     category: 'proxy',
     desc: '本机 HTTP/SOCKS 代理;WSL mirrored 网络下可用 127.0.0.1 直连 Windows 侧端口。',
     usage: 'curl/aria2/git 等加 --all-proxy=http://127.0.0.1:7890 或 export https_proxy=http://127.0.0.1:7890 ;具体端口以本机实际代理配置为准。',
+    compact: 'curl/git 等加 --all-proxy=http://127.0.0.1:7890 ;端口以本机实际代理为准。',
   },
   {
     id: 'playwright',
@@ -107,6 +135,7 @@ export const CATALOG: SoftwareTool[] = [
     category: 'browser',
     desc: 'WSL 内无头 Chromium,可驱动真实浏览器。',
     usage: '经 MCP 工具 mcp__browser__* (navigate/click/type/screenshot);或 npx playwright 脚本;Chromium 在 ~/.cache/ms-playwright。',
+    compact: '走 MCP mcp__browser__* (navigate/click/type/screenshot);或 npx playwright 脚本。',
   },
   {
     id: 'uvx',
@@ -114,6 +143,7 @@ export const CATALOG: SoftwareTool[] = [
     category: 'runtime',
     desc: 'Python 包/工具即用即走运行器。',
     usage: 'uvx <package> 直接跑 PyPI 工具(如 uvx mcp-server-sqlite)。',
+    compact: 'uvx <package> 直接跑 PyPI 工具(如 uvx mcp-server-sqlite)。',
   },
   {
     id: 'interop',
@@ -121,6 +151,7 @@ export const CATALOG: SoftwareTool[] = [
     category: 'runtime',
     desc: 'WSL 可执行 Windows exe(cmd.exe/powershell/任意 .exe)。',
     usage: '用完整路径调用,如 cmd.exe /c "命令"(Windows 盘符路径形如 C:\\Windows\\System32\\cmd.exe)或直接运行 Windows exe。',
+    compact: 'cmd.exe /c "命令" 调 Windows 程序;盘符路径形如 C:\\Windows\\System32\\cmd.exe 。',
   },
   {
     id: 'zstd',
@@ -128,6 +159,7 @@ export const CATALOG: SoftwareTool[] = [
     category: 'misc',
     desc: '会话文件是 zstd 多帧 JSONL,解压/压缩工具。',
     usage: 'node 用 fzstd(node_modules/fzstd)decompress;或命令行 zstd -d。',
+    compact: 'node 用 fzstd decompress;或命令行 zstd -d 。',
   },
 ]
 
@@ -235,14 +267,14 @@ function writeJson(file: string, value: unknown): void {
 /* ------------------------------------------------------------------- reads */
 
 /** One row from catalog.json, or the reason it cannot be used. */
-type NormalizedRow = { ok: true; tool: SoftwareTool } | { ok: false; reason: string }
+export type NormalizedRow = { ok: true; tool: SoftwareTool } | { ok: false; reason: string }
 
 /**
  * Structurally validate one hand-written row. Unknown extra fields are dropped
  * (they carry no meaning for the panel or the prompt), but a *missing* required
  * field is reported instead of silently swallowed — see `UserCatalog.dropped`.
  */
-function normalizeEntry(value: unknown): NormalizedRow {
+export function normalizeEntry(value: unknown): NormalizedRow {
   if (typeof value !== 'object' || value === null) return { ok: false, reason: 'row is not an object' }
   const entry = value as Partial<SoftwareTool>
   const idHint =
@@ -258,6 +290,9 @@ function normalizeEntry(value: unknown): NormalizedRow {
   if (typeof entry.category !== 'string' || entry.category.trim().length === 0) {
     return { ok: false, reason: `missing "category"${idHint}` }
   }
+  // `compact` is optional: a non-string or blank value means "not provided", so
+  // the row still loads and the renderer falls back to `usage`.
+  const compact = typeof entry.compact === 'string' && entry.compact.trim().length > 0 ? entry.compact.trim() : undefined
   return {
     ok: true,
     tool: {
@@ -268,6 +303,7 @@ function normalizeEntry(value: unknown): NormalizedRow {
       category: entry.category.trim() as Category,
       desc: entry.desc.trim(),
       usage: entry.usage.trim(),
+      ...(compact !== undefined ? { compact } : {}),
     },
   }
 }
@@ -397,7 +433,36 @@ export function mergedTools(config: Partial<SoftwareToolsConfig>): SoftwareTool[
     category: entry.category,
     desc: entry.desc,
     usage: entry.usage,
+    ...(entry.compact !== undefined ? { compact: entry.compact } : {}),
   }))
+}
+
+/**
+ * Injection mode persisted in `selection.json`. Missing/invalid → `full`, so an
+ * existing state file (which has no `mode` key) keeps injecting `usage`.
+ */
+export function readRenderMode(config: Partial<SoftwareToolsConfig>): RenderMode {
+  try {
+    const raw = JSON.parse(readFileSync(selectionFile(config), 'utf8')) as { mode?: unknown }
+    if (isRenderMode(raw.mode)) return raw.mode
+  } catch {
+    /* missing or unreadable — the default mode */
+  }
+  return 'full'
+}
+
+/**
+ * Persist the injection mode next to the checked ids. The ids are preserved
+ * verbatim (this endpoint never touches the selection) and an unchanged mode
+ * does not rewrite the file, so repeated clicks spawn no backup files.
+ * @returns true when the file was written.
+ */
+export function writeRenderMode(config: Partial<SoftwareToolsConfig>, mode: RenderMode): boolean {
+  if (readRenderMode(config) === mode) return false
+  const file = selectionFile(config)
+  backupFile(file)
+  writeJson(file, { ids: readSelected(config), mode })
+  return true
 }
 
 /** Checked ids, in the persisted order. Missing/unreadable → empty. */
@@ -413,26 +478,45 @@ export function readSelected(config: Partial<SoftwareToolsConfig>): string[] {
 
 /**
  * Persist the checked ids (backup + atomic write). An unchanged selection is
- * not rewritten, so repeated toggles do not spawn backup files.
+ * not rewritten, so repeated toggles do not spawn backup files. The persisted
+ * injection mode is carried over verbatim: this endpoint only owns `ids`.
  * @returns true when the file was written.
  */
 export function writeSelected(config: Partial<SoftwareToolsConfig>, ids: string[]): boolean {
   const current = readSelected(config)
   if (current.length === ids.length && current.every((id, index) => id === ids[index])) return false
   const file = selectionFile(config)
+  const mode = readRenderMode(config)
   backupFile(file)
-  writeJson(file, { ids })
+  writeJson(file, { ids, mode })
   return true
 }
 
-/** The compact injected section: one line per checked tool. */
-export function renderSection(config: Partial<SoftwareToolsConfig>, ids: string[]): string {
+/** The text injected for one tool: `compact` in compact mode (when present), else `usage`. */
+export function injectedText(tool: SoftwareTool, mode: RenderMode): string {
+  if (mode === 'compact' && tool.compact !== undefined && tool.compact.trim().length > 0) return tool.compact
+  return tool.usage
+}
+
+/**
+ * The injected section: one line per checked tool.
+ *
+ * `mode` selects the per-entry field — `usage` for `full`, `compact` for
+ * `compact` — and an entry without `compact` falls back to `usage` in either
+ * mode, so partial adoption is safe. `config.compact === undefined` is not the
+ * only way to shrink it: the caller decides the mode.
+ */
+export function renderSection(
+  config: Partial<SoftwareToolsConfig>,
+  ids: string[],
+  mode: RenderMode = 'full',
+): string {
   const catalog = mergedTools(config)
   const chosen = ids
     .map((id) => catalog.find((t) => t.id === id))
     .filter((t): t is SoftwareTool => t !== undefined)
   if (chosen.length === 0) return ''
-  const lines = chosen.map((t) => `- ${t.name}: ${t.usage}`)
+  const lines = chosen.map((t) => `- ${t.name}: ${injectedText(t, mode)}`)
   return `# 本机可用软件工具(用户已勾选,按需用 bash/shell 调用)\n${lines.join('\n')}`
 }
 
@@ -464,8 +548,11 @@ export interface RemoveToolResult {
 export type AddResult = AddToolResult | MutationFailure
 export type RemoveResult = RemoveToolResult | MutationFailure
 
-/** Field caps: `usage` is re-injected on every request, so it stays bounded. */
-const MAX_LENGTH = { id: 64, name: 200, desc: 1000, usage: 2000 } as const
+/**
+ * Field caps. `usage` and `compact` are both re-injected on every request, so
+ * both stay bounded; `compact` is the small one by definition.
+ */
+const MAX_LENGTH = { id: 64, name: 200, desc: 1000, usage: 2000, compact: 200 } as const
 const ID_PATTERN = /^[a-z0-9][a-z0-9._-]*$/
 const MAX_DEDUPE = 200
 
@@ -503,6 +590,18 @@ function validateText(value: unknown, field: keyof typeof MAX_LENGTH): Valid<str
   return { ok: true, value: trimmed }
 }
 
+/**
+ * Validate the optional `compact` field: absent / null / blank means "not
+ * provided" (the entry falls back to `usage`), anything else must be a bounded
+ * non-empty string.
+ */
+function validateCompact(value: unknown): Valid<string | undefined> {
+  if (value === undefined || value === null) return { ok: true, value: undefined }
+  if (typeof value !== 'string') return fail('bad-request', 'compact must be a string')
+  if (value.trim().length === 0) return { ok: true, value: undefined }
+  return validateText(value, 'compact')
+}
+
 /** Derive a JSON/selection-safe id from a display name (ascii-only; may be "tool"). */
 export function slugify(name: string): string {
   const slug = name
@@ -514,7 +613,7 @@ export function slugify(name: string): string {
 }
 
 /** `base`, else `base-2`, `base-3`, … — the first id not in `taken`. */
-function dedupeId(base: string, taken: Set<string>): string {
+export function dedupeId(base: string, taken: Set<string>): string {
   if (!taken.has(base)) return base
   for (let n = 2; n <= MAX_DEDUPE; n += 1) {
     const candidate = `${base}-${n}`
@@ -533,6 +632,8 @@ function buildEntry(input: Record<string, unknown>, taken: Set<string>): BuiltEn
   if (!desc.ok) return desc
   const usage = validateText(input.usage, 'usage')
   if (!usage.ok) return usage
+  const compact = validateCompact(input.compact)
+  if (!compact.ok) return compact
 
   const category = input.category
   if (typeof category !== 'string' || !CATEGORIES.includes(category as Category)) {
@@ -557,7 +658,14 @@ function buildEntry(input: Record<string, unknown>, taken: Set<string>): BuiltEn
   return {
     ok: true,
     explicit,
-    tool: { id, name: name.value, category: category as Category, desc: desc.value, usage: usage.value },
+    tool: {
+      id,
+      name: name.value,
+      category: category as Category,
+      desc: desc.value,
+      usage: usage.value,
+      ...(compact.value !== undefined ? { compact: compact.value } : {}),
+    },
   }
 }
 

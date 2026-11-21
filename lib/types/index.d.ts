@@ -11,12 +11,17 @@
  * instructions for the bash / shell tools it already has.
  *
  * State and catalog are served over a fenced RPC channel `/_dsh-software-tools`:
- *   - `list`   → { catalog, categoryLabels, selected, section, catalogError?, catalogWarnings? }
+ *   - `list`   → { catalog, categoryLabels, selected, section, mode,
+ *                sectionFull, sectionCompact, catalogError?, catalogWarnings? }
  *                catalog rows carry `origin` (builtin | user | override) and
  *                `readonly` (built-in rows cannot be deleted); `catalogError`
  *                means the file cannot be parsed at all, `catalogWarnings`
- *                lists unusable/duplicate rows that block add/remove
+ *                lists unusable/duplicate rows that block add/remove.
+ *                `section` is the text injected right now (per `mode`);
+ *                `sectionFull` / `sectionCompact` are both renderings, so the
+ *                panel can show the cost of each without a round trip
  *   - `set`    → { selected }                    persist the checked ids {ids}
+ *                or the injection mode {mode}; the other field is preserved
  *   - `add`    → { id, origin, overwritten }     { name, desc, usage, category, id?, overwrite? }
  *   - `remove` → { id, selectionUpdated, fallbackToBuiltin }   { id }
  *
@@ -41,7 +46,7 @@
 import type { Context } from '@deepseek-ai/cordis';
 import type { SoftwareToolsConfig } from './catalog.js';
 export { CATALOG, CATEGORY_LABELS } from './catalog.js';
-export type { CatalogEntry, Category, SoftwareTool, SoftwareToolsConfig } from './catalog.js';
+export type { CatalogEntry, Category, RenderMode, SoftwareTool, SoftwareToolsConfig } from './catalog.js';
 export declare const name = "dsh-software-tools";
 export declare const inject: string[];
 export declare const CHANNEL = "/_dsh-software-tools";

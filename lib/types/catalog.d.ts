@@ -14,7 +14,22 @@ export interface SoftwareTool {
     category: Category;
     desc: string;
     usage: string;
+    /**
+     * Short form injected instead of `usage` when the selection is in `compact`
+     * mode: what the tool is + the one command that decides how to call it.
+     * Optional — a missing `compact` falls back to `usage` (see
+     * {@link renderSection}), so existing catalogs keep working unchanged.
+     */
+    compact?: string;
 }
+/**
+ * Which field is injected into the system prompt.
+ *   - `full`    → `usage` (the complete invocation recipe)
+ *   - `compact` → `compact`, falling back to `usage` per entry when absent
+ */
+export type RenderMode = 'full' | 'compact';
+export declare const RENDER_MODES: readonly RenderMode[];
+export declare function isRenderMode(value: unknown): value is RenderMode;
 /**
  * A merged catalog row as the panel receives it. `origin` tells the browser
  * where the row comes from, `readonly` whether it may be deleted:
@@ -41,6 +56,11 @@ export interface CatalogEntry extends SoftwareTool {
  * Tuning/ops/benchmark/history detail belongs in that tool's own docs, never
  * here -- see the add-software-tool skill, which enforces this when entries
  * are written or revised.
+ *
+ * `compact` is the smaller sibling injected when the panel's 精简模式 is on: the
+ * one line that decides *whether and how* to call the tool. Every built-in and
+ * every user entry is expected to carry one; a missing `compact` falls back to
+ * `usage` (never a blank line).
  */
 export declare const CATALOG: SoftwareTool[];
 export declare const CATEGORY_LABELS: Record<Category, string>;
@@ -54,6 +74,20 @@ export declare function selectionFile(config: Partial<SoftwareToolsConfig>): str
  * @returns the backup path, or undefined when the file does not exist yet.
  */
 export declare function backupFile(file: string): string | undefined;
+/** One row from catalog.json, or the reason it cannot be used. */
+export type NormalizedRow = {
+    ok: true;
+    tool: SoftwareTool;
+} | {
+    ok: false;
+    reason: string;
+};
+/**
+ * Structurally validate one hand-written row. Unknown extra fields are dropped
+ * (they carry no meaning for the panel or the prompt), but a *missing* required
+ * field is reported instead of silently swallowed — see `UserCatalog.dropped`.
+ */
+export declare function normalizeEntry(value: unknown): NormalizedRow;
 /** One row of catalog.json that could not be used (0-based index in `tools`). */
 export interface CatalogDrop {
     index: number;
@@ -102,16 +136,38 @@ export declare function mergeCatalog(user: UserCatalog): MergedCatalog;
 export declare function mergedCatalog(config: Partial<SoftwareToolsConfig>): MergedCatalog;
 /** Merged rows without the panel-only fields (prompt rendering, set checks). */
 export declare function mergedTools(config: Partial<SoftwareToolsConfig>): SoftwareTool[];
+/**
+ * Injection mode persisted in `selection.json`. Missing/invalid → `full`, so an
+ * existing state file (which has no `mode` key) keeps injecting `usage`.
+ */
+export declare function readRenderMode(config: Partial<SoftwareToolsConfig>): RenderMode;
+/**
+ * Persist the injection mode next to the checked ids. The ids are preserved
+ * verbatim (this endpoint never touches the selection) and an unchanged mode
+ * does not rewrite the file, so repeated clicks spawn no backup files.
+ * @returns true when the file was written.
+ */
+export declare function writeRenderMode(config: Partial<SoftwareToolsConfig>, mode: RenderMode): boolean;
 /** Checked ids, in the persisted order. Missing/unreadable → empty. */
 export declare function readSelected(config: Partial<SoftwareToolsConfig>): string[];
 /**
  * Persist the checked ids (backup + atomic write). An unchanged selection is
- * not rewritten, so repeated toggles do not spawn backup files.
+ * not rewritten, so repeated toggles do not spawn backup files. The persisted
+ * injection mode is carried over verbatim: this endpoint only owns `ids`.
  * @returns true when the file was written.
  */
 export declare function writeSelected(config: Partial<SoftwareToolsConfig>, ids: string[]): boolean;
-/** The compact injected section: one line per checked tool. */
-export declare function renderSection(config: Partial<SoftwareToolsConfig>, ids: string[]): string;
+/** The text injected for one tool: `compact` in compact mode (when present), else `usage`. */
+export declare function injectedText(tool: SoftwareTool, mode: RenderMode): string;
+/**
+ * The injected section: one line per checked tool.
+ *
+ * `mode` selects the per-entry field — `usage` for `full`, `compact` for
+ * `compact` — and an entry without `compact` falls back to `usage` in either
+ * mode, so partial adoption is safe. `config.compact === undefined` is not the
+ * only way to shrink it: the caller decides the mode.
+ */
+export declare function renderSection(config: Partial<SoftwareToolsConfig>, ids: string[], mode?: RenderMode): string;
 /** Endpoint failure in the shape the browser validates. */
 export interface MutationFailure {
     ok: false;
@@ -139,6 +195,8 @@ export type AddResult = AddToolResult | MutationFailure;
 export type RemoveResult = RemoveToolResult | MutationFailure;
 /** Derive a JSON/selection-safe id from a display name (ascii-only; may be "tool"). */
 export declare function slugify(name: string): string;
+/** `base`, else `base-2`, `base-3`, … — the first id not in `taken`. */
+export declare function dedupeId(base: string, taken: Set<string>): string;
 /**
  * Add (or, with `overwrite: true`, replace) one user entry.
  *

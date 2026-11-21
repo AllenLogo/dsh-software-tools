@@ -20,6 +20,9 @@ A sidebar **软件工具** panel for DeepSeek Harness Web: maintain a curated in
 | 📥 | 内置 + 用户扩展合并 | 内置通用目录(aria2 / proxy / playwright / uvx / interop / zstd …);用户扩展 `catalog.json` 同 id 覆盖内置 |
 | ✏️ | 面板内增删 | 面板底部 **+ 新增条目**(名称/说明/用法/分类)直接入库;用户条目行内「删除」并二次确认;内置条目只读不可删。删除会先备份 `catalog.json`、同步取消勾选;若该条覆盖了内置条目,删除后自动回落到内置版本 |
 | 🧠 | 系统提示注入 | 勾选的工具以紧凑段落注入每个请求的 system prompt(`systemPrompt.section`,与 persona / plan-mode 同一机制) |
+| 🪶 | 精简模式 | 每个条目可写一条 `compact` 短句,面板一键切换:注入量降到完整模式的约 35%,面板同时显示两种模式的开销 |
+| 📊 | 注入预算 | 面板顶部常驻「已注入 N 字 ≈ N token」;超 8000 字转警告色,单条注入行超 300 字在该行标黄 |
+| ☑️ | 批量勾选 | 分类 tab 上的「全选本类 / 清空本类」把整个分类用**一次** `set` 调用写完 |
 | 🛠 | 内置 skill | 随插件自带 `add-software-tool` 技能:模型学会把新装软件写进用户目录,免重编译/重启;条目按"使用说明"口径收窄,不写调优 |
 | 🔒 | 回环 RPC | 面板↔宿主走 loopback 钉死的 RPC channel,读本地 JSON,不触碰网络 |
 
@@ -73,7 +76,8 @@ dsh plugin --profile web add dsh-software-tools
 | `name` | ≤200 字 | 显示名 + 用途括注,如 `ffmpeg (音视频处理)` |
 | `category` | download / proxy / media / browser / knowledge / runtime / model / misc 之一 | 不确定选 `misc` |
 | `desc` | ≤1000 字(只在面板显示,不注入) | 一句话、约 40–60 字:"是什么 / 何时用" |
-| `usage` | ≤2000 字(**每轮请求都注入**) | ≤5 行、约 600 字:命令 + 调用前提 |
+| `usage` | ≤2000 字(**完整模式下每轮请求都注入**) | ≤5 行、约 600 字:命令 + 调用前提 |
+| `compact` | ≤200 字(**精简模式下注入**;可选) | 一句话、约 100 字:是什么 + 第一条命令;留空则回落注入 `usage` |
 
 每次写 `catalog.json` / `selection.json` 都会先复制一份 `<文件名>.bak.<YYYYMMDD-HHMMSS>`(每个文件保留最近 20 份),再原子写入(临时文件 + rename),写到一半崩溃也不会截断目录。用户目录**只要有一处读不懂就绝不覆盖**:整个 JSON 解析失败报 `catalogError`;个别行缺 `id`/`name`/`desc`/`usage`/`category` 时,该行**原样保留在文件里**并计入 `catalogWarnings`,面板显示警告并停用新增/删除,直到修好;重复 id 按「后面覆盖前面」去重并给出警告。
 
